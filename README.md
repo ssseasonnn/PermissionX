@@ -34,12 +34,13 @@ launch {
         val result = request(READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE)
         if (result.isGranted) {
             //Now we have storage permission.
-        }
-        if (result.shouldShowRational) {
-            //Show permission rational
-        }
-        if (result.alwaysDenied) {
-            //User always denied our permission
+        }else {
+            if (result.shouldShowRational) {
+                //Show permission rational
+            }
+            if (result.alwaysDenied) {
+                //User always denied our permission
+            }
         }
     } catch (t: Throwable) {
         Log.w("TAG", t)
