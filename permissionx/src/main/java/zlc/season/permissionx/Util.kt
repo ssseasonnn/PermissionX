@@ -1,12 +1,15 @@
 package zlc.season.permissionx
 
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import androidx.core.content.PermissionChecker.PERMISSION_GRANTED
 import androidx.core.content.PermissionChecker.checkSelfPermission
 import androidx.fragment.app.FragmentActivity
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onStart
 import zlc.season.claritypotion.ClarityPotion.Companion.clarityPotion
 import zlc.season.claritypotion.ClarityPotion.Companion.currentActivity
-import kotlin.Result.Companion.failure
-import kotlin.Result.Companion.success
 
 internal fun checkPermission(permission: String): Boolean {
     return checkSelfPermission(clarityPotion, permission) == PERMISSION_GRANTED
@@ -22,39 +25,33 @@ internal fun checkPermissions(permissions: Array<out String>): Boolean {
     return result
 }
 
-internal fun resume(request: Request, result: Result) {
-    resume(request.requestCode, result)
-}
-
-internal fun resume(requestCode: Int, result: Result) {
-    val continuation = RequestPool.get(requestCode) ?: return
-    if (continuation.isActive) {
-        continuation.resumeWith(success(result))
-    }
-}
-
-internal fun resumeFailed(request: Request, failedMsg: String) {
-    resumeFailed(request.requestCode, failedMsg)
-}
-
-internal fun resumeFailed(requestCode: Int, failedMsg: String) {
-    val continuation = RequestPool.get(requestCode) ?: return
-    if (continuation.isActive) {
-        continuation.resumeWith(failure(RuntimeException(failedMsg)))
-    }
-}
-
-internal fun exec(request: Request) {
+internal suspend fun exec(request: Request): Result {
     when (val currentActivity = currentActivity()) {
-        null -> resumeFailed(request, "Activity not found!")
-        !is FragmentActivity -> resumeFailed(request, "Activity should inherit FragmentActivity!")
+        null -> throw RuntimeException("Activity not found!")
+        !is FragmentActivity -> throw RuntimeException("Activity should inherit FragmentActivity!")
         else -> {
             val fm = currentActivity.supportFragmentManager
             if (fm.isDestroyed) {
-                resumeFailed(request, "Activity already finished!")
+                throw RuntimeException("Activity already finished!")
             } else {
-                VirtualFragment.open(fm, request)
+                val prevOrientation = currentActivity.requestedOrientation
+                return VirtualFragment.showAsFlow(fm, request)
+                    .onStart { currentActivity.lockOrientation() }
+                    .onCompletion { currentActivity.restoreOrientation(prevOrientation) }
+                    .first()
             }
         }
     }
+}
+
+private fun FragmentActivity.lockOrientation() {
+    requestedOrientation = when (resources.configuration.orientation) {
+        Configuration.ORIENTATION_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        Configuration.ORIENTATION_PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        else -> ActivityInfo.SCREEN_ORIENTATION_NOSENSOR
+    }
+}
+
+private fun FragmentActivity.restoreOrientation(preOrientation: Int) {
+    requestedOrientation = preOrientation
 }

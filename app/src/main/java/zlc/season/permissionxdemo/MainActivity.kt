@@ -5,20 +5,21 @@ import android.os.Bundle
 import android.os.Environment.DIRECTORY_DOWNLOADS
 import android.os.Environment.getExternalStoragePublicDirectory
 import android.util.Log
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import kotlinx.android.synthetic.main.activity_main.*
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.*
 import zlc.season.permissionx.request
 import java.io.File
 
-class MainActivity : AppCompatActivity(), CoroutineScope by MainScope() {
+class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        btn_storage.setOnClickListener {
-            launch {
+        findViewById<View>(R.id.btn_storage).setOnClickListener {
+            lifecycleScope.launch {
                 try {
                     val result = request(READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE)
                     Log.d("TAG", result.toString())
@@ -35,8 +36,8 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             }
         }
 
-        btn_camera.setOnClickListener {
-            launch {
+        findViewById<View>(R.id.btn_camera).setOnClickListener {
+            lifecycleScope.launch {
                 try {
                     val result = request(CAMERA)
                     Log.d("TAG", result.toString())
@@ -52,6 +53,6 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope() {
 
     override fun onDestroy() {
         super.onDestroy()
-        cancel()
+        println("destroy")
     }
 }

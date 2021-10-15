@@ -1,63 +1,72 @@
 package zlc.season.permissionx
 
-import android.content.pm.PackageManager.PERMISSION_GRANTED
-import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.isActive
 
 class VirtualFragment : Fragment() {
     companion object {
-        private const val TAG = "VirtualFragment"
-        private const val PARAM = "PARAM"
+        private const val TAG = "zlc.season.permissionx.VirtualFragment"
 
-        fun open(fm: FragmentManager, request: Request) {
-            val bridgeFragment = fm.findFragmentByTag(TAG)
-            if (bridgeFragment != null) {
-                (bridgeFragment as VirtualFragment).realExec(request)
-            } else {
-                VirtualFragment().apply {
-                    arguments = Bundle().apply { putParcelable(PARAM, request) }
-                }.also {
-                    fm.beginTransaction().add(it, TAG).commitAllowingStateLoss()
+        private fun FragmentManager.add(fragment: Fragment) {
+            beginTransaction().add(fragment, TAG).commitNowAllowingStateLoss()
+        }
+
+        private fun FragmentManager.remove(fragment: Fragment) {
+            beginTransaction().remove(fragment).commitNowAllowingStateLoss()
+        }
+
+        @OptIn(ExperimentalCoroutinesApi::class)
+        fun showAsFlow(fm: FragmentManager, request: Request) = callbackFlow {
+            val fragment = VirtualFragment()
+            val cb = object : FragmentManager.FragmentLifecycleCallbacks() {
+                override fun onFragmentResumed(fm: FragmentManager, f: Fragment) {
+                    if (fragment === f) {
+                        fragment.callback = {
+                            trySend(it)
+                            fm.remove(fragment)
+                            close()
+                        }
+                        fragment.launcher.launch(request.permissions)
+                    }
                 }
+
+                override fun onFragmentDestroyed(fm: FragmentManager, f: Fragment) {
+                    if (fragment === f) {
+                        close()
+                    }
+                }
+            }
+
+            if (isActive) {
+                fm.registerFragmentLifecycleCallbacks(cb, false)
+                fm.add(fragment)
+            }
+
+            awaitClose {
+                fm.unregisterFragmentLifecycleCallbacks(cb)
             }
         }
     }
 
-    init {
-        retainInstance = true
-    }
+    var callback: (Result) -> Unit = {}
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        arguments?.let {
-            val request = it.getParcelable<Request>(PARAM)!!
-            realExec(request)
-        }
-    }
-
-    private fun realExec(request: Request) {
-        if (checkPermissions(request.permissions)) {
-            resume(request, Result(true))
-        } else {
-            requestPermissions(request.permissions, request.requestCode)
-        }
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
+    val launcher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         var isGranted = true
         var shouldShowRational = false
         var alwaysDenied = false
         var deniedPermission = ""
 
-        for (i in grantResults.indices) {
-            if (grantResults[i] != PERMISSION_GRANTED) {
+        for (each in it) {
+            val permissionName = each.key
+            val flag = each.value
+            if (!flag) {
                 isGranted = false
-                deniedPermission = permissions[i]
+                deniedPermission = permissionName
                 val rationale = shouldShowRequestPermissionRationale(deniedPermission)
                 if (rationale) {
                     shouldShowRational = true
@@ -68,13 +77,13 @@ class VirtualFragment : Fragment() {
             }
         }
 
-        resume(
-            requestCode, Result(
-                isGranted,
-                shouldShowRational,
-                alwaysDenied,
-                deniedPermission
-            )
+        val result = Result(
+            isGranted,
+            shouldShowRational,
+            alwaysDenied,
+            deniedPermission
         )
+
+        callback(result)
     }
 }
