@@ -20,7 +20,7 @@ allprojects {
 
 ```gradle
 dependencies {
-	implementation 'com.github.ssseasonnn:PermissionX:1.0.0'
+	implementation 'com.github.ssseasonnn:PermissionX:1.0.1'
 }
 ```
 
@@ -51,7 +51,7 @@ launch {
 ## License
 
 > ```
-> Copyright 2019 Season.Zlc
+> Copyright 2021 Season.Zlc
 >
 > Licensed under the Apache License, Version 2.0 (the "License");
 > you may not use this file except in compliance with the License.
