@@ -20,7 +20,7 @@ allprojects {
 
 ```gradle
 dependencies {
-	implementation 'com.github.ssseasonnn:PermissionX:1.0.1'
+	implementation 'com.github.ssseasonnn:PermissionX:1.0.2'
 }
 ```
 
